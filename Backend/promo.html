@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reclama tu Botín | Tridyland</title>
+    <style>
+        /* Colores extraídos de tu marca: Morado (#8a4aa3) y Verde Lima (#a3d133) */
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background-color: #632d77; /* Un morado un poco más oscuro para el fondo */
+            color: #ffffff; 
+            text-align: center; 
+            padding: 20px; 
+            margin: 0;
+        }
+        
+        .card { 
+            background: #8a4aa3; /* El morado exacto de tu header */
+            border: 4px solid #a3d133; /* Borde verde lima Tridyland */
+            border-radius: 20px; 
+            padding: 30px; 
+            max-width: 400px; 
+            margin: 20px auto; 
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3); 
+        }
+
+        h1 { 
+            font-size: 26px; 
+            color: #a3d133; 
+            text-shadow: 2px 2px 0px #4a148c; 
+            margin-top: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        p {
+            font-size: 15px;
+            line-height: 1.4;
+        }
+
+        input { 
+            width: 100%; 
+            padding: 14px; 
+            margin: 10px 0; 
+            border-radius: 10px; 
+            border: 2px solid #ccc; 
+            font-size: 16px; 
+            text-align: center; 
+            box-sizing: border-box; /* Para que no se salga de la caja */
+            transition: 0.2s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #a3d133;
+            box-shadow: 0 0 8px rgba(163, 209, 51, 0.5);
+        }
+
+        /* Input especial para el código */
+        #codigoInput { 
+            background: #632d77; 
+            color: #a3d133; 
+            border: 2px dashed #a3d133; 
+            font-weight: 900;
+            letter-spacing: 2px;
+            font-size: 18px;
+        }
+
+        button { 
+            background: #ffaa00; /* El naranja arcade de tu HUD */
+            color: #111111; /* Texto oscuro para que resalte cañón */
+            border: 3px solid #ffffff; /* Borde blanco grueso */
+            padding: 16px 30px; 
+            font-size: 18px; 
+            font-weight: 900; 
+            border-radius: 50px; /* Aquí le damos la forma de píldora redonda */
+            cursor: pointer; 
+            margin-top: 15px; 
+            width: 100%; 
+            transition: all 0.2s; 
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            /* Le metemos el efecto 3D que tiene tu HUD + una sombra por fuera */
+            box-shadow: inset 0 -4px 0 rgba(0,0,0,0.2), 0 5px 15px rgba(0,0,0,0.3); 
+        }
+
+        button:hover { 
+            transform: scale(1.05); 
+            background: #ffbc33; /* Un toque más brillante */
+            /* Hacemos que la sombra interior se achique para que parezca que lo estás presionando */
+            box-shadow: inset 0 -2px 0 rgba(0,0,0,0.2), 0 8px 20px rgba(0,0,0,0.4); 
+        }
+
+        #status { 
+            margin-top: 20px; 
+            font-weight: bold; 
+            font-size: 16px; 
+            color: #ffd700; /* Amarillo para errores/alertas */
+        }
+        
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+
+    <div class="card" id="formContainer">
+        <img src="https://i.postimg.cc/bNStWhGV/2-2.png" alt="Tridyland Logo" style="max-width: 220px; height: auto; margin-bottom: 5px; filter: drop-shadow(0px 4px 6px rgba(0,0,0,0.3));">
+        
+        <p>¡Has encontrado un objeto épico! Ingresa tus datos para reclamar tu XP.</p>
+        
+        <input type="text" id="nombreInput" placeholder="Nombre de Héroe" autocomplete="name">
+        <input type="email" id="emailInput" placeholder="Correo de Mensajería" autocomplete="email">
+        
+        <p style="font-size: 13px; color: #e0e0e0; margin-bottom: 5px; font-weight: bold;">Código de Botín:</p>
+        <input type="text" id="codigoInput" readonly>
+
+        <button onclick="reclamarBotin()">RECLAMAR XP</button>
+        <div id="status"></div>
+    </div>
+
+    <div class="card hidden" id="successContainer">
+        <div style="font-size: 60px; margin-bottom: 10px;">🐶✨</div>
+        <h1 style="color: #a3d133;">¡BOTÍN ASEGURADO!</h1>
+        <p id="resultText" style="font-size: 18px; font-weight: bold;"></p>
+        <p style="color: #e0e0e0;">Te enviamos un pergamino (correo) mágico con tu acceso.</p>
+        <button onclick="window.location.href='https://tridyland.com'">IR A LA TIENDA</button>
+    </div>
+
+    <script>
+        const params = new URLSearchParams(window.location.search);
+        const codigo = params.get('c');
+        
+        if (codigo) {
+            document.getElementById('codigoInput').value = codigo;
+        } else {
+            document.getElementById('status').innerText = "⚠️ Falta el código mágico en la URL.";
+        }
+
+        async function reclamarBotin() {
+            const nombre = document.getElementById('nombreInput').value;
+            const email = document.getElementById('emailInput').value;
+            const status = document.getElementById('status');
+            const btn = document.querySelector('button');
+
+            if (!nombre || !email) {
+                status.innerText = "¡Oye! Un héroe necesita nombre y correo.";
+                return;
+            }
+
+            status.innerText = "Invocando puntos...";
+            btn.style.opacity = "0.7";
+            btn.innerText = "ESPERA...";
+
+            try {
+                const response = await fetch('api/v1/tiendanube/reclamar-promo', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nombre, email, codigo })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    document.getElementById('formContainer').classList.add('hidden');
+                    document.getElementById('successContainer').classList.remove('hidden');
+                    document.getElementById('resultText').innerText = data.mensaje;
+                } else {
+                    status.innerText = "❌ " + (data.detail || "Error desconocido");
+                    btn.style.opacity = "1";
+                    btn.innerText = "RECLAMAR XP";
+                }
+            } catch (error) {
+                status.innerText = "❌ El servidor está durmiendo. Intenta luego.";
+                btn.style.opacity = "1";
+                btn.innerText = "RECLAMAR XP";
+            }
+        }
+    </script>
+</body>
+</html>

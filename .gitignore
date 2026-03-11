@@ -1,0 +1,17 @@
+# Archivos de sistema y entorno
+.env
+__pycache__/
+*.pyc
+venv/
+.vscode/
+.idea/
+
+# Datos de Docker (¡Importante no subirlos!)
+postgres_data/
+n8n_data/
+local-files/
+*.sql
+
+
+Backend/tarjetas_generadas
+Backend/temp_processed_images

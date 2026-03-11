@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Escáner Tridyland</title>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #1a1a1a; color: white; text-align: center; margin: 0; padding: 20px; }
+        h1 { color: #00ffcc; }
+        #reader { width: 100%; max-width: 400px; margin: 0 auto; border-radius: 10px; overflow: hidden; border: 3px solid #00ffcc; background: #000; }
+        .input-group { margin: 20px 0; }
+        input[type="number"] { font-size: 24px; padding: 10px; width: 150px; text-align: center; border-radius: 8px; border: none; }
+        button { background-color: #00ffcc; color: black; font-size: 20px; font-weight: bold; padding: 15px 30px; border: none; border-radius: 8px; cursor: pointer; width: 100%; max-width: 400px; margin-top: 10px; }
+        button:active { background-color: #00ccaa; }
+        #resultado { margin-top: 20px; padding: 15px; border-radius: 8px; font-size: 18px; display: none; }
+        .success { background-color: #28a745; }
+        .error { background-color: #dc3545; }
+    </style>
+</head>
+<body>
+
+    <img src="https://i.postimg.cc/bNStWhGV/2-2.png" alt="Tridyland Logo" style="max-width: 200px; height: auto; margin-top: 10px; filter: drop-shadow(0px 0px 8px #00ffcc);">
+    
+    <h2 style="color: #00ffcc; margin-top: 5px; font-size: 18px;">Scanner Admin 🚀</h2>
+    
+    <div class="input-group">
+        <label style="display: block; margin-bottom: 5px; font-size: 18px;">Monto de la Compra ($):</label>
+        <input type="number" id="montoInput" placeholder="250" autofocus>
+    </div>
+
+    <div id="reader"></div>
+
+    <button id="btnEscanear" onclick="iniciarEscaner()">📸 Activar Cámara</button>
+
+    <div id="resultado"></div>
+
+    <audio id="beepSound" src="https://www.soundjay.com/buttons/sounds/beep-07a.mp3" preload="auto" crossorigin="anonymous"></audio>
+<audio id="levelupSound" src="https://www.myinstants.com/media/sounds/level-up-theme.mp3" preload="auto" crossorigin="anonymous"></audio>
+
+    <script>
+        // 👇 RECUERDA PONER TU URL Y TU API KEY 👇
+        const API_URL = "https://api.tridyland.com/api/v1/tiendanube/activar-tarjeta"; 
+        const API_KEY = "moshimoshimonotr420des"; 
+
+        let html5QrcodeScanner;
+
+        // 1. Definimos los elementos de audio afuera para fácil acceso
+        const beep = document.getElementById("beepSound");
+        const levelup = document.getElementById("levelupSound");
+        
+        function iniciarEscaner() {
+            const monto = document.getElementById("montoInput").value;
+            if (!monto || monto <= 0) {
+                mostrarMensaje("Ponle el monto de la compra primero.", "error");
+                return;
+            }
+
+            // 🔊 EL HACK DEFINITIVO: Desbloqueo por "Warm-up"
+            // Reproducimos y pausamos inmediatamente en el mismo hilo del click
+            [beep, levelup].forEach(audio => {
+                audio.volume = 0.1; 
+                audio.play().then(() => {
+                    audio.pause();
+                    audio.currentTime = 0;
+                    audio.volume = 1.0; // Restauramos volumen para el uso real
+                }).catch(e => console.log("Permiso de audio pendiente..."));
+            });
+
+            document.getElementById("btnEscanear").style.display = "none";
+            mostrarMensaje("Escaneando...", "");
+
+            html5QrcodeScanner = new Html5Qrcode("reader");
+            html5QrcodeScanner.start(
+                { facingMode: "environment" }, 
+                { fps: 10, qrbox: {width: 250, height: 250} },
+                (decodedText) => {
+                    html5QrcodeScanner.stop(); 
+                    document.getElementById("btnEscanear").style.display = "block";
+                    
+                    // Suena el BEEP de éxito de lectura
+                    beep.currentTime = 0;
+                    beep.play().catch(e => console.error("Error en Beep:", e));
+
+                    procesarQR(decodedText, monto);
+                },
+                (errorMessage) => { }
+            ).catch((err) => {
+                mostrarMensaje("Error al abrir la cámara.", "error");
+                document.getElementById("btnEscanear").style.display = "block";
+            });
+        }
+
+        async function procesarQR(urlLeida, monto) {
+            let codigo = urlLeida;
+            try {
+                const url = new URL(urlLeida);
+                codigo = url.searchParams.get("c") || urlLeida; 
+            } catch(e) {}
+
+            mostrarMensaje(`Procesando código...`, "");
+
+            try {
+                const response = await fetch(API_URL, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-API-Key": API_KEY 
+                    },
+                    body: JSON.stringify({
+                        codigo: codigo,
+                        monto_compra: parseFloat(monto)
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    document.getElementById("montoInput").value = ""; 
+
+                    // 🌟 MODO HYPE: ¿Subió de nivel? (Aplica para tarjetas nuevas y ligadas)
+                    if (data.subio_nivel) {
+                        // 🌟 LEVEL UP (Solo una llamada al objeto que ya 'calentamos')
+                        levelup.currentTime = 0;
+                        levelup.play().catch(e => {
+                            console.log("Reintentando LevelUp...");
+                            levelup.load();
+                            levelup.play();
+                        });
+
+                        document.getElementById("levelupSound").play(); 
+                        
+                        const textoHype = `
+                            <strong style="font-size: 24px;">¡LEVEL UP! 🌟</strong><br>
+                            ${data.detalle_admin}<br>
+                        `;
+                        const div = document.getElementById("resultado");
+                        div.style.display = "block";
+                        div.style.backgroundColor = "#ffc107"; 
+                        div.style.color = "#000";
+                        div.innerHTML = textoHype;
+                    } else {
+                        mostrarMensaje(data.mensaje + " " + data.detalle_admin, "success");
+                    }
+
+                } else {
+                    mostrarMensaje("Error: " + data.detail, "error");
+                }
+            } catch (error) {
+                mostrarMensaje("Error de red. ¿Tienes internet?", "error");
+            }
+        }
+
+        function mostrarMensaje(texto, tipo) {
+            const div = document.getElementById("resultado");
+            div.style.display = "block";
+            div.style.backgroundColor = ""; 
+            div.style.color = "";
+            div.className = tipo;
+            div.innerText = texto;
+        }
+    </script>
+</body>
+</html>

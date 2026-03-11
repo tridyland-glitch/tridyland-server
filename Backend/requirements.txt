@@ -1,0 +1,16 @@
+fastapi==0.128.0
+pydantic==2.12.5
+pydantic_settings==2.12.0
+SQLAlchemy==2.0.35
+Unidecode==1.3.6
+psycopg2-binary
+python-dotenv
+requests
+uvicorn
+python-multipart
+pillow
+onnxruntime
+rembg
+aiofiles
+google-generativeai
+streamlit
