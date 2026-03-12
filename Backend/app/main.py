@@ -5,7 +5,7 @@ from app.api.v1.endpoints import views
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 
-BASE_DIR = Path(__file__).resolve().parent
+BASE_DIR = Path(__file__).resolve().parent.parent
 
 # --- INICIALIZACIÓN DE LA APP ---
 # Agregamos 'dependencies=[Depends(get_api_key)]' para blindar TODA la app
