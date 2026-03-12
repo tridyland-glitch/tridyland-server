@@ -26,7 +26,7 @@ class MovementCreate(BaseModel):
 class MovementResponse(MovementCreate):
     id: int
     class Config:
-        from_attributes = True
+        orm_mode = True
 
 class SmartInventoryRequest(BaseModel):
     query_text: str  # Lo que dijo el usuario: "Axolote rosa"

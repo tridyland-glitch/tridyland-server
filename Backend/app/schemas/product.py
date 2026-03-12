@@ -34,7 +34,7 @@ class Product(ProductBase):
     class Config:
         orm_mode = True
     class Config:
-        from_attributes = True
+        orm_mode = True
 
 class ProductUpdate(BaseModel):
     name: Optional[str] = None
