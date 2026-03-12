@@ -35,8 +35,8 @@
 
     <div id="resultado"></div>
 
-    <audio id="beepSound" src="https://www.soundjay.com/buttons/sounds/beep-07a.mp3" preload="auto" crossorigin="anonymous"></audio>
-<audio id="levelupSound" src="https://www.myinstants.com/media/sounds/level-up-theme.mp3" preload="auto" crossorigin="anonymous"></audio>
+    <audio id="beepSound" src="sounds/beep-07a.mp3" preload="auto"></audio>
+    <audio id="levelupSound" src="sounds/level-up-theme.mp3" preload="auto"></audio>
 
     <script>
         // 👇 RECUERDA PONER TU URL Y TU API KEY 👇
@@ -127,8 +127,8 @@
                             levelup.load();
                             levelup.play();
                         });
-
-                        document.getElementById("levelupSound").play(); 
+                        
+                        // 👇 ¡BORRAMOS LA LÍNEA DUPLICADA QUE ESTABA AQUÍ! 👇
                         
                         const textoHype = `
                             <strong style="font-size: 24px;">¡LEVEL UP! 🌟</strong><br>
