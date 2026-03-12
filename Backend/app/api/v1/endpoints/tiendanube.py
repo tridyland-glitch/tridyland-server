@@ -419,6 +419,11 @@ async def acumular_puntos(
             .scalar() or 0
 
         if puntos_hoy >= limite:
+            # 🛡️ AUNQUE LLEGUE AL LÍMITE DE PUNTOS, GUARDAMOS LOS CLICKS AUDITADOS
+            if payload.clicks_raw > 0:
+                db.add(PuntosLedger(usuario_id=usuario_db_id, puntos=0, accion=payload.accion, clicks_raw=payload.clicks_raw))
+                db.commit()
+
             return {
                 "status": "limite_alcanzado", 
                 "mensaje": f"Has alcanzado el límite de {limite} puntos.",
@@ -436,7 +441,8 @@ async def acumular_puntos(
     nuevo_registro = PuntosLedger(
         usuario_id=usuario_db_id, # <- AQUÍ ESTABA EL ERROR
         puntos=puntos_a_sumar,
-        accion=payload.accion
+        accion=payload.accion,
+        clicks_raw=payload.clicks_raw
     )
     db.add(nuevo_registro)
     db.commit()
@@ -468,6 +474,48 @@ async def reclamar_botin(req: ReclamoRequest, db: Session = Depends(get_db)):
     usuario = db.query(Usuario).filter(Usuario.email == req.usuario_id).first()
     if not usuario:
         raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+    
+    # --- 🛡️ LA CAPA DE AUDITORÍA (TIME-TRAVEL PROOF OF WORK) ---
+    if req.nivel in [2, 5, 10, 25, 50]:
+        # 1. Definimos las reglas del juego
+        xp_requerida_nivel = { 2: 50, 5: 500, 10: 1500, 25: 5000, 50: 50000 }
+        hp_jefes = { 2: 50, 5: 150, 10: 500, 25: 1500, 50: 5000 }
+        
+        xp_meta = xp_requerida_nivel.get(req.nivel, 0)
+        hp_requerido = hp_jefes.get(req.nivel, 0)
+        
+        # 2. Traemos todo el historial de la cuenta en orden cronológico
+        historial = db.query(PuntosLedger).filter(
+            PuntosLedger.usuario_id == usuario.id
+        ).order_by(PuntosLedger.created_at.asc()).all()
+        
+        xp_acumulada = 0
+        fecha_desbloqueo_boss = None
+        
+        # 3. Buscamos el segundo exacto en el que alcanzó la XP para este Boss
+        for registro in historial:
+            xp_acumulada += registro.puntos
+            if xp_acumulada >= xp_meta and fecha_desbloqueo_boss is None:
+                fecha_desbloqueo_boss = registro.created_at
+                break # ¡Encontramos el momento en que apareció el Boss en su pantalla!
+                
+        if not fecha_desbloqueo_boss:
+            raise HTTPException(status_code=400, detail="Aún no tienes la XP necesaria para este botín.")
+            
+        # 4. Sumamos SOLO los clicks que ocurrieron después de que apareció el Boss
+        clicks_directos_al_boss = sum(
+            reg.clicks_raw 
+            for reg in historial 
+            if reg.created_at >= fecha_desbloqueo_boss and reg.accion == "juego_clicker"
+        )
+        
+        # 5. El Veredicto Final (Con un 15% de tolerancia por si falló su internet en algunos clicks)
+        if clicks_directos_al_boss < (hp_requerido * 0.85):
+            print(f"🚨 HACKER DETECTADO: {usuario.email} intentó matar Boss {req.nivel} con {clicks_directos_al_boss} clicks (Necesitaba ~{hp_requerido}).")
+            raise HTTPException(
+                status_code=403, 
+                detail=f"¡El Boss sigue vivo! Has dado {clicks_directos_al_boss} golpes, ¡Sigue luchando para reclamar la recompensa!"
+            )
 
     # 3. Verificar si ya se cobró (Ledger)
     reclamo_previo = db.query(PuntosLedger).filter(

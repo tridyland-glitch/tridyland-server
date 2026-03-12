@@ -1,13 +1,14 @@
 import time
 
 from pydantic import BaseModel, Field, field_validator
-from typing import Literal
+from typing import Literal, Optional
 
 # Modelo 1: Para GANAR puntos (El que ya teníamos, bien estricto)
 class AcumularRequest(BaseModel):
     usuario_id: str = Field(..., description="Email del cliente")
     puntos: int = Field(..., gt=0, le=50, description="Puntos ganados. Max 50 por request.")
     accion: Literal["click_logo", "juego_clicker", "vista_producto", "add_carrito"]
+    clicks_raw: Optional[int] = 0
     timestamp: int
     hash_seguridad: str
 

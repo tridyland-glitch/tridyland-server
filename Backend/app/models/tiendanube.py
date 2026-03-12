@@ -90,5 +90,7 @@ class PuntosLedger(Base):
     # Relaciones
     usuario = relationship("Usuario", back_populates="movimientos")
 
+    clicks_raw = Column(Integer, default=0, nullable=False)
+
     def __repr__(self):
         return f"<PuntosLedger(usuario_id='{self.usuario_id}', puntos={self.puntos}, accion='{self.accion}')>"
