@@ -4,10 +4,10 @@ import hmac
 import json
 import math
 import random
-import secrets
+from datetime import datetime, timedelta
 import string
 import time
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import JSONResponse
 from fastapi import APIRouter, BackgroundTasks, Body, Header, UploadFile, File, Form, HTTPException, status, Request
 import os
 import io
@@ -18,7 +18,7 @@ import fitz
 from rembg import remove
 import requests
 from app.core.security import get_api_key
-from app.core.email import enviar_correo_bienvenida_magica, enviar_correo_botin, enviar_correo_experiencia
+from app.core.email import enviar_correo_experiencia
 from app.models.tiendanube import PuntosLedger,Usuario,TarjetaQR
 from app.schemas.tiendanube import CanjearRequest, AcumularRequest, ReclamoRequest
 from app.services.ai_service import generate_social_media_pack
@@ -449,7 +449,7 @@ async def acumular_puntos(
 
 @router.post("/puntos/reclamar")
 async def reclamar_botin(req: ReclamoRequest, db: Session = Depends(get_db)):
-    # 1. Validar Seguridad (El mismo candado de siempre)
+    # 1. Validar Seguridad (HMAC)
     mensaje_crudo = f"{req.usuario_id}|{req.nivel}|{req.opcion}|{req.timestamp}"
     hash_calculado = hmac.new(
         settings.API_SECRET_KEY.encode('utf-8'), 
@@ -458,86 +458,78 @@ async def reclamar_botin(req: ReclamoRequest, db: Session = Depends(get_db)):
     ).hexdigest()
     
     if req.hash_seguridad != hash_calculado:
-        raise HTTPException(status_code=401, detail="No intentes hackear a Tridy 🐶🗡️")
+        raise HTTPException(status_code=401, detail="Firma inválida.")
 
-    # 2. Validar que el premio exista
-    if req.nivel not in CATALOGO_PREMIOS or req.opcion not in CATALOGO_PREMIOS[req.nivel]:
+    # 2. Obtener el premio del catálogo
+    premio = CATALOGO_PREMIOS.get(req.nivel, {}).get(req.opcion)
+    if not premio:
         raise HTTPException(status_code=400, detail="Premio no válido.")
     
-    # 🪪 TRADUCTOR
-    email_cliente = req.usuario_id
-    usuario = db.query(Usuario).filter(Usuario.email == email_cliente).first()
-    
+    usuario = db.query(Usuario).filter(Usuario.email == req.usuario_id).first()
     if not usuario:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado en la base de datos.")
-        
-    usuario_db_id = usuario.id
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
 
-    premio = CATALOGO_PREMIOS[req.nivel][req.opcion]
-
-    # 3. VERIFICAR EN BASE DE DATOS QUE NO LO HAYA COBRADO ANTES
-    # (Suponiendo que tienes un modelo PuntosLedger o similar, vamos a registrarlo como una acción)
+    # 3. Verificar si ya se cobró (Ledger)
     reclamo_previo = db.query(PuntosLedger).filter(
-        PuntosLedger.usuario_id == usuario_db_id,
+        PuntosLedger.usuario_id == usuario.id,
         PuntosLedger.accion == f"reclamo_lvl_{req.nivel}"
     ).first()
 
     if reclamo_previo:
-        return {"status": "error", "mensaje": "Ya reclamaste el botín de este nivel bro."}
+        return {"status": "error", "mensaje": "Este botín ya fue reclamado anteriormente."}
 
-    # 4. FORJAR EL CUPÓN EN TIENDANUBE
-    codigo_unico = f"TRIDY-LVL{req.nivel}-{generar_codigo_aleatorio()}"
+    # --- 🛡️ LÓGICA DE PROTECCIÓN TRIDYLAND ---
     
-    # Si detecta que es un regalo físico, le pone el prefijo REGALO
-    if "Regalo" in premio["descripcion"]:
-        codigo_unico = f"REGALO-LVL{req.nivel}-{generar_codigo_aleatorio()}"
-
+    # Límite de 3 días para usarlo
+    fecha_expiracion = (datetime.utcnow() + timedelta(days=3)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    
+    codigo_unico = f"TRIDY-L{req.nivel}-{generar_codigo_aleatorio()}"
+    
+    # Payload base para Tiendanube
     payload_cupon = {
         "code": codigo_unico,
         "type": premio["tipo"],
         "value": premio["valor"],
-        "max_uses": 1  # ¡Solo se puede usar UNA vez!
+        "max_uses": 1,
+        "expires_at": fecha_expiracion  # 🕒 Candado de tiempo
     }
-    print("payload_cupon",payload_cupon)
 
+    # ⚔️ PROTECCIÓN PARA EL NIVEL 50 (50% OFF)
+    if req.nivel == 50:
+        # Limitamos el descuento máximo a $250 MXN
+        payload_cupon["max_discount_value"] = 250 
+        # (Opcional) Solo para ciertos productos si los tienes identificados
+        # payload_cupon["product_ids"] = [12345, 67890] 
+        # (Opcional) Compra mínima de $500 para que el 50% valga la pena
+        payload_cupon["min_price"] = 500
+
+    # 🚚 PROTECCIÓN PARA ENVÍO GRATIS
+    if premio["tipo"] == "shipping":
+        # Tiendanube usa el valor 0 o vacío para envío gratis total
+        payload_cupon["value"] = 0 
+
+    # 4. Llamada a la API de Tiendanube
     url_tiendanube = f"https://api.tiendanube.com/v1/{settings.TIENDANUBE_STORE_ID}/coupons"
     headers_api = {
         "Authentication": f"bearer {settings.TIENDANUBE_ACCESS_TOKEN}",
-        "User-Agent": "TridylandApp (hola@tridyland.com)",
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "User-Agent": "TridylandApp (hola@tridyland.com)"
     }
 
     respuesta = requests.post(url_tiendanube, json=payload_cupon, headers=headers_api)
     
     if respuesta.status_code != 201:
-        print(f"❌ Error al crear cupón en TN: {respuesta.text}")
-        raise HTTPException(status_code=500, detail="Los duendes de la forja fallaron. Intenta de nuevo.")
+        raise HTTPException(status_code=500, detail="Error al forjar el cupón en la tienda.")
 
-    # 5. GUARDAR EL RECLAMO EN LA BASE DE DATOS
-    # Guardamos 0 puntos porque no le cobramos XP, pero registramos la acción para que no vuelva a cobrar
-    registro_reclamo = PuntosLedger(
-        usuario_id=usuario_db_id,
-        puntos=0, 
-        accion=f"reclamo_lvl_{req.nivel}"
-    )
-    db.add(registro_reclamo)
+    # 5. Registrar en DB
+    db.add(PuntosLedger(usuario_id=usuario.id, puntos=0, accion=f"reclamo_lvl_{req.nivel}"))
     db.commit()
 
-    print(f"🎉 CUPÓN FORJADO: {codigo_unico} para {req.usuario_id}")
-
-    # 5.5 ENVIAR EL CORREO DE RESPALDO
-    enviar_correo_botin(
-        destinatario=req.usuario_id, 
-        nivel=req.nivel, 
-        codigo_cupon=codigo_unico, 
-        descripcion_premio=premio["descripcion"]
-    )
-
-    # 6. DEVOLVER EL BOTÍN AL FRONTEND
     return {
         "status": "success",
         "codigo_cupon": codigo_unico,
-        "descripcion": premio["descripcion"]
+        "descripcion": premio["descripcion"],
+        "expira": "3 días"
     }
 
 @router.get("/puntos/saldo", status_code=200)
