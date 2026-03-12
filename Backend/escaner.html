@@ -48,9 +48,6 @@
         // 1. Definimos los elementos de audio afuera para fácil acceso
         const beep = document.getElementById("beepSound");
         const levelup = document.getElementById("levelupSound");
-
-        beep.currentTime = 0;
-        beep.play().catch(e => console.error("Error en Beep:", e));
         
         function iniciarEscaner() {
             const monto = document.getElementById("montoInput").value;
