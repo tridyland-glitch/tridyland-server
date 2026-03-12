@@ -28,6 +28,7 @@ from app.core.config import settings
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
 from sqlalchemy.orm import Session
+from sqlalchemy import or_, func
 from app.core.database import get_db
 
 router = APIRouter()
@@ -584,9 +585,13 @@ async def obtener_saldo(
     ).all()
     lista_reclamos = [r[0] for r in reclamos] 
     
+    # 🛡️ VERIFICADOR MULTI-CANAL (Tiendanube + Físico)
     tiene_compra = db.query(PuntosLedger).filter(
         PuntosLedger.usuario_id == usuario_db_id,
-        PuntosLedger.accion.like("compra_real_%")
+        or_(
+            PuntosLedger.accion.like("compra_real_%"),       # Compras en línea
+            PuntosLedger.accion.like("activacion_stand_%")   # Compras escaneadas en físico
+        )
     ).first() is not None
 
     return {
