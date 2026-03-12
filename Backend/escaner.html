@@ -120,6 +120,10 @@
 
                     // 🌟 MODO HYPE: ¿Subió de nivel? (Aplica para tarjetas nuevas y ligadas)
                     if (data.subio_nivel) {
+                        // 🛑 Apagamos el sonido normal de escaneo inmediatamente
+                        beep.pause();
+                        beep.currentTime = 0;
+
                         // 🌟 LEVEL UP (Solo una llamada al objeto que ya 'calentamos')
                         levelup.currentTime = 0;
                         levelup.play().catch(e => {
@@ -128,17 +132,11 @@
                             levelup.play();
                         });
                         
-                        // 👇 ¡BORRAMOS LA LÍNEA DUPLICADA QUE ESTABA AQUÍ! 👇
-                        
-                        const textoHype = `
-                            <strong style="font-size: 24px;">¡LEVEL UP! 🌟</strong><br>
-                            ${data.detalle_admin}<br>
-                        `;
                         const div = document.getElementById("resultado");
                         div.style.display = "block";
                         div.style.backgroundColor = "#ffc107"; 
                         div.style.color = "#000";
-                        div.innerHTML = textoHype;
+                        div.innerHTML = `<strong style="font-size: 24px;">¡LEVEL UP! 🌟</strong><br>${data.detalle_admin}`;
                     } else {
                         mostrarMensaje(data.mensaje + " " + data.detalle_admin, "success");
                     }
