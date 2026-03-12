@@ -590,7 +590,7 @@ async def obtener_saldo(
         PuntosLedger.usuario_id == usuario_db_id,
         or_(
             PuntosLedger.accion.like("compra_real_%"),       # Compras en línea
-            PuntosLedger.accion.like("activacion_stand_%")   # Compras escaneadas en físico
+            PuntosLedger.accion.like("reclamo_qr_%")   # Compras escaneadas en físico
         )
     ).first() is not None
 
